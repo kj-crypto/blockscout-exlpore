@@ -1,0 +1,30 @@
+version: '3'
+
+services:
+  blockscout:
+    image: blockscout
+    build:
+      context: .
+      args:
+        - COIN=ETH
+    ports:
+     - 4000:4000
+    environment:
+      - DATABASE_URL=postgresql://eth-user:eth-password@postgres:5432/explorer?ssl=false
+      - ETHEREUM_JSONRPC_VARIANT=ganache
+      - ETHEREUM_JSONRPC_HTTP_URL=http://host.docker.internal:${GPORT}
+      - ETHEREUM_JSONRPC_WS_URL=ws://host.docker.internal:${GPORT}
+    extra_hosts: 
+      - host.docker.internal:host-gateway
+    entrypoint: '/bin/sh -c "mix do ecto.create, ecto.migrate; mix phx.server"'
+    depends_on:
+      - postgres
+  
+  postgres:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_PASSWORD=eth-password
+      - POSTGRES_USER=eth-user
+      - POSTGRES_DB=explorer
+    ports:
+      - 5432:5432
