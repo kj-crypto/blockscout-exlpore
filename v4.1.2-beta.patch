@@ -1,0 +1,307 @@
+diff --git a/apps/block_scout_web/lib/block_scout_web/controllers/api/rpc/contract_controller.ex b/apps/block_scout_web/lib/block_scout_web/controllers/api/rpc/contract_controller.ex
+index 8f0c117..4109fdd 100644
+--- a/apps/block_scout_web/lib/block_scout_web/controllers/api/rpc/contract_controller.ex
++++ b/apps/block_scout_web/lib/block_scout_web/controllers/api/rpc/contract_controller.ex
+@@ -82,8 +82,8 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
+   def verifysourcecode(
+         conn,
+         %{
+-          "codeformat" => "solidity-standard-json-input",
+-          "contractaddress" => address_hash,
++          "codeFormat" => "solidity-standard-json-input",
++          "contractAddress" => address_hash,
+           "sourceCode" => json_input
+         } = params
+       ) do
+@@ -107,7 +107,7 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
+     end
+   end
+ 
+-  def verifysourcecode(conn, %{"codeformat" => "solidity-standard-json-input"}) do
++  def verifysourcecode(conn, %{"codeFormat" => "solidity-standard-json-input"}) do
+     render(conn, :error, error: "Missing sourceCode or contractaddress fields")
+   end
+ 
+@@ -513,10 +513,10 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
+ 
+   defp fetch_verifysourcecode_params(params) do
+     {:ok, %{}}
+-    |> required_param(params, "contractaddress", "address_hash")
+-    |> required_param(params, "contractname", "name")
+-    |> required_param(params, "compilerversion", "compiler_version")
+-    |> optional_param(params, "constructorArguements", "constructor_arguments")
++    |> required_param(params, "contractAddress", "address_hash")
++    |> required_param(params, "contractName", "name")
++    |> required_param(params, "compilerVersion", "compiler_version")
++    # |> optional_param(params, "constructorArguements", "constructor_arguments")
+     |> optional_param(params, "constructorArguments", "constructor_arguments")
+   end
+ 
+diff --git a/apps/block_scout_web/lib/block_scout_web/etherscan.ex b/apps/block_scout_web/lib/block_scout_web/etherscan.ex
+index 8f45890..5073331 100644
+--- a/apps/block_scout_web/lib/block_scout_web/etherscan.ex
++++ b/apps/block_scout_web/lib/block_scout_web/etherscan.ex
+@@ -2724,7 +2724,7 @@ defmodule BlockScoutWeb.Etherscan do
+   }
+ 
+   @contract_verifysourcecode_action %{
+-    name: "verifysourcecode",
++    name: "verifySourceCode",
+     description: """
+     Verify a contract with Standard input JSON file. Its interface the same as <a href="https://docs.etherscan.io/tutorials/verifying-contracts-programmatically">Etherscan</a>'s API endpoint
+     <br/>
+@@ -2733,27 +2733,27 @@ defmodule BlockScoutWeb.Etherscan do
+     required_params: [
+       %{
+         name: "solidity-standard-json-input",
+-        key: "codeformat",
++        key: "codeFormat",
+         placeholder: "solidity-standard-json-input",
+         type: "string",
+         description: "Format of sourceCode(supported only \"solidity-standard-json-input\")"
+       },
+       %{
+-        key: "contractaddress",
+-        placeholder: "contractaddress",
++        key: "contractAddress",
++        placeholder: "contractAddress",
+         type: "string",
+         description: "The address of the contract."
+       },
+       %{
+-        key: "contractname",
+-        placeholder: "contractname",
++        key: "contractName",
++        placeholder: "contractName",
+         type: "string",
+         description:
+           "The name of the contract. It could be empty string(\"\"), just contract name(\"ContractName\"), or filename and contract name(\"contracts/contract_1.sol:ContractName\")"
+       },
+       %{
+-        key: "compilerversion",
+-        placeholder: "compilerversion",
++        key: "compilerVersion",
++        placeholder: "compilerVersion",
+         type: "string",
+         description: "The compiler version for the contract."
+       },
+diff --git a/apps/block_scout_web/lib/block_scout_web/templates/address_contract/index.html.eex b/apps/block_scout_web/lib/block_scout_web/templates/address_contract/index.html.eex
+index 2a371a9..71db01a 100644
+--- a/apps/block_scout_web/lib/block_scout_web/templates/address_contract/index.html.eex
++++ b/apps/block_scout_web/lib/block_scout_web/templates/address_contract/index.html.eex
+@@ -23,7 +23,7 @@
+               <div style="display: inline-block;">
+                 <%= render BlockScoutWeb.CommonComponentsView, "_info.html" %>
+                 <span> <%= gettext("Contract is not verified. However, we found a verified contract with the same bytecode in Blockscout DB") %> <%= link(
+-                  metadata_for_verification.address_hash, 
++                  metadata_for_verification.address_hash,
+                   to: address_contract_path(@conn, :index, metadata_for_verification.address_hash)) %>.<br/> <%= gettext("All metadata displayed below is from that contract. In order to verify current contract, click") %> <i><%= gettext("Verify & Publish") %></i> <%= gettext("button") %></span>
+               </div>
+               <%= link(gettext("Verify & Publish"), to: path, class: "button button-primary button-sm float-right ml-3", "data-test": "verify_and_publish") %>
+@@ -103,20 +103,24 @@
+             </button>
+           </div>
+           <div class="tile tile-muted mb-4">
+-            <pre class="pre-scrollable line-numbers" data-activate-highlight><code class="solidity"><%= for {line, number} <- contract_lines_with_index(target_contract.contract_source_code) do %><div data-line-number="<%= number %>"><%= line %></div><% end %></code></pre>
++            <pre class="pre-scrollable line-numbers" data-activate-highlight><code class="solidity"><%= for {line, number} <- contract_lines_with_index(target_contract.contract_source_code) do %><div data-line-number="<%= number %>"><%= line <> "\n" %></div><% end %></code></pre>
+           </div>
+         </section>
+ 
+         <%= Enum.map(additional_sources, fn additional_source -> %>
+           <section>
+             <div class="d-flex justify-content-between align-items-baseline">
+-              <h3><%= additional_source.file_name %></h3>
++              <%= if additional_source.file_name == additional_source.file_name |> Path.expand |> Path.relative_to_cwd do %>
++               <h3><%= additional_source.file_name %></h3>
++              <% else %>
++                <h3><%= additional_source.file_name <> " ---> " <> (additional_source.file_name |> Path.expand |> Path.relative_to_cwd) %></h3>
++              <% end  %>
+               <button type="button" class="btn-line" id="button" data-toggle="tooltip" data-placement="top" data-clipboard-text="<%= additional_source.contract_source_code %>" aria-label="Copy Contract Source Code">
+                 <%= gettext "Copy Source Code" %>
+               </button>
+             </div>
+             <div class="tile tile-muted mb-4">
+-              <pre class="pre-scrollable line-numbers" data-activate-highlight><code class="solidity"><%= for {line, number} <- contract_lines_with_index(additional_source.contract_source_code) do %><div data-line-number="<%= number %>"><%= line %></div><% end %></code></pre>
++              <pre class="pre-scrollable line-numbers" data-activate-highlight><code class="solidity"><%= for {line, number} <- contract_lines_with_index(additional_source.contract_source_code) do %><div data-line-number="<%= number %>"><%= line <> "\n" %></div><% end %></code></pre>
+             </div>
+           </section>
+         <% end)%>
+@@ -179,7 +183,7 @@
+               <div class="tile tile-muted mb-4">
+                 <pre class="pre-wrap pre-scrollable"><code class="nohighlight"><%= creation_code(@address) %></code></pre>
+               </div>
+-            <% end %>    
++            <% end %>
+             <%= if fully_verified do %>
+               <div class="d-flex justify-content-between align-items-baseline">
+                 <h3><%= gettext "Deployed ByteCode" %></h3>
+diff --git a/apps/explorer/lib/explorer/repo/config_helper.ex b/apps/explorer/lib/explorer/repo/config_helper.ex
+index 9e0223a..25944b2 100644
+--- a/apps/explorer/lib/explorer/repo/config_helper.ex
++++ b/apps/explorer/lib/explorer/repo/config_helper.ex
+@@ -29,10 +29,15 @@ defmodule Explorer.Repo.ConfigHelper do
+ 
+   # sobelow_skip ["DOS.StringToAtom"]
+   defp extract_parameters(database_url) do
+-    ~r/\w*:\/\/(?<username>\w+):(?<password>\w*)?@(?<hostname>(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])):(?<port>\d+)\/(?<database>\w+)/
+-    |> Regex.named_captures(database_url)
+-    |> Keyword.new(fn {k, v} -> {String.to_atom(k), v} end)
+-    |> Keyword.put(:url, database_url)
++    captures =
++      ~r/\w+:\/\/(?<username>[^\s\/\@:\?]+):(?<password>[^\s\/\@:\?]+)@(?<hostname>[^\s\/\@:\?]+):(?<port>\d{1,5})\/(?<database>[^\s\/\@:\?]+)/
++      |> Regex.named_captures(database_url)
++    if captures == nil do
++      exit("Database url doesn't match the pattern")
++    end
++    captures
++      |> Keyword.new(fn {k, v} -> {String.to_atom(k), v} end)
++      |> Keyword.put(:url, database_url)
+   end
+ 
+   defp get_env_vars(vars, env_function) do
+diff --git a/apps/explorer/lib/explorer/smart_contract/solidity/code_compiler.ex b/apps/explorer/lib/explorer/smart_contract/solidity/code_compiler.ex
+index adb0779..224da4d 100644
+--- a/apps/explorer/lib/explorer/smart_contract/solidity/code_compiler.ex
++++ b/apps/explorer/lib/explorer/smart_contract/solidity/code_compiler.ex
+@@ -171,22 +171,25 @@ defmodule Explorer.SmartContract.Solidity.CodeCompiler do
+   defp tune_json(json_input) when is_binary(json_input) do
+     case Jason.decode(json_input) do
+       {:ok, map_input} ->
+-        map_set_input_keys = map_input |> Map.keys() |> MapSet.new()
+-        map_set_required_keys = MapSet.new(@required_standard_input_fields)
+-
+-        if MapSet.subset?(map_set_required_keys, map_set_input_keys) do
+-          settings = Map.fetch!(map_input, "settings")
+-          new_settings = Map.put(settings, "outputSelection", @default_output_selection)
+-          map_input |> Map.replace("settings", new_settings) |> Jason.encode()
+-        else
+-          {:error, :json}
+-        end
+-
++        tune_json(map_input)
+       _ ->
+         {:error, :json}
+     end
+   end
+ 
++  defp tune_json(map_input) when is_map(map_input) do
++    map_set_input_keys = map_input |> Map.keys() |> MapSet.new()
++    map_set_required_keys = MapSet.new(@required_standard_input_fields)
++
++    if MapSet.subset?(map_set_required_keys, map_set_input_keys) do
++      settings = Map.fetch!(map_input, "settings")
++      new_settings = Map.put(settings, "outputSelection", @default_output_selection)
++      map_input |> Map.replace("settings", new_settings) |> Jason.encode()
++    else
++      {:error, :json}
++    end
++  end
++
+   defp tune_json(_json_input), do: {:error, :json}
+ 
+   defp fetch_candidates(contracts, "") when is_map(contracts) do
+diff --git a/apps/explorer/lib/explorer/smart_contract/solidity/verifier.ex b/apps/explorer/lib/explorer/smart_contract/solidity/verifier.ex
+index 9f4b028..98aed88 100644
+--- a/apps/explorer/lib/explorer/smart_contract/solidity/verifier.ex
++++ b/apps/explorer/lib/explorer/smart_contract/solidity/verifier.ex
+@@ -52,10 +52,19 @@ defmodule Explorer.SmartContract.Solidity.Verifier do
+   end
+ 
+   def evaluate_authenticity_via_standard_json_input(address_hash, params, json_input) do
+-    verify(address_hash, params, json_input)
++    if is_binary(json_input) do
++      case Jason.decode(json_input) do
++        {:ok, map_json_input} ->
++          verify(address_hash, params, map_json_input)
++        _ ->
++          {:error, :json}
++        end
++    else
++      verify(address_hash, params, json_input)
++    end
+   end
+ 
+-  defp verify(address_hash, params, json_input) do
++  defp verify(address_hash, params, json_input) when is_map(json_input) do
+     name = Map.get(params, "name", "")
+     compiler_version = Map.fetch!(params, "compiler_version")
+     constructor_arguments = Map.get(params, "constructor_arguments", "")
+@@ -72,45 +81,39 @@ defmodule Explorer.SmartContract.Solidity.Verifier do
+ 
+     case solc_output do
+       {:ok, candidates} ->
+-        case Jason.decode(json_input) do
+-          {:ok, map_json_input} ->
+-            Enum.reduce_while(candidates, %{}, fn candidate, _acc ->
+-              file_path = candidate["file_path"]
+-              source_code = map_json_input["sources"][file_path]["content"]
+-              contract_name = candidate["name"]
+-
+-              case compare_bytecodes(
+-                     candidate,
+-                     address_hash,
+-                     constructor_arguments,
+-                     autodetect_constructor_arguments,
+-                     source_code,
+-                     contract_name
+-                   ) do
+-                {:ok, verified_data} ->
+-                  secondary_sources =
+-                    for {file, %{"content" => source}} <- map_json_input["sources"],
+-                        file != file_path,
+-                        do: %{"file_name" => file, "contract_source_code" => source, "address_hash" => address_hash}
+-
+-                  additional_params =
+-                    map_json_input
+-                    |> extract_settings_from_json()
+-                    |> Map.put("contract_source_code", source_code)
+-                    |> Map.put("file_path", file_path)
+-                    |> Map.put("name", contract_name)
+-                    |> Map.put("secondary_sources", secondary_sources)
+-
+-                  {:halt, {:ok, verified_data, additional_params}}
+-
+-                err ->
+-                  {:cont, {:error, err}}
+-              end
+-            end)
+-
+-          _ ->
+-            {:error, :json}
+-        end
++          Enum.reduce_while(candidates, %{}, fn candidate, _acc ->
++            file_path = candidate["file_path"]
++            source_code = json_input["sources"][file_path]["content"]
++            contract_name = candidate["name"]
++
++            case compare_bytecodes(
++                    candidate,
++                    address_hash,
++                    constructor_arguments,
++                    autodetect_constructor_arguments,
++                    source_code,
++                    contract_name
++                  ) do
++              {:ok, verified_data} ->
++                secondary_sources =
++                  for {file, %{"content" => source}} <- json_input["sources"],
++                      file != file_path,
++                      do: %{"file_name" => file, "contract_source_code" => source, "address_hash" => address_hash}
++
++                additional_params =
++                  json_input
++                  |> extract_settings_from_json()
++                  |> Map.put("contract_source_code", source_code)
++                  |> Map.put("file_path", file_path)
++                  |> Map.put("name", contract_name)
++                  |> Map.put("secondary_sources", secondary_sources)
++
++                {:halt, {:ok, verified_data, additional_params}}
++
++              err ->
++                {:cont, {:error, err}}
++            end
++          end)
+ 
+       error_response ->
+         error_response
