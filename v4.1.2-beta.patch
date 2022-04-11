@@ -159,6 +159,86 @@ index 9e0223a..25944b2 100644
    end
  
    defp get_env_vars(vars, env_function) do
+diff --git a/apps/explorer/lib/explorer/smart_contract/compiler_version.ex b/apps/explorer/lib/explorer/smart_contract/compiler_version.ex
+index d54522c..c927718 100644
+--- a/apps/explorer/lib/explorer/smart_contract/compiler_version.ex
++++ b/apps/explorer/lib/explorer/smart_contract/compiler_version.ex
+@@ -58,10 +58,14 @@ defmodule Explorer.SmartContract.CompilerVersion do
+         :solc ->
+           json
+           |> Jason.decode!()
+-          |> Map.fetch!("builds")
+-          |> remove_unsupported_versions(compiler)
+-          |> format_versions(compiler)
+-          |> Enum.reverse()
++          |> Map.fetch!("releases")
++          |> Map.merge(%{"latest" => Map.fetch!(
++            json |> Jason.decode!() |> Map.fetch!("releases"),
++            json |> Jason.decode!() |> Map.fetch!("latestRelease")
++            )})
++          |> Enum.reject(fn {k, _} -> Enum.member?(@unsupported_solc_versions, k) end)
++          |> Enum.map(fn {k, v} -> {k, v |> String.replace("soljson-", "") |> String.replace(".js", "") } end)
++          |> Map.new
+ 
+         :vyper ->
+           json
+@@ -81,7 +85,12 @@ defmodule Explorer.SmartContract.CompilerVersion do
+           end)
+       end
+ 
+-    ["latest" | versions]
++    if is_list(versions) do
++      ["latest" | versions]
++    else
++      versions
++    end
++
+   end
+ 
+   defp parse_integer(string) do
+diff --git a/apps/explorer/lib/explorer/smart_contract/solc_downloader.ex b/apps/explorer/lib/explorer/smart_contract/solc_downloader.ex
+index 5f63b31..677a7cf 100644
+--- a/apps/explorer/lib/explorer/smart_contract/solc_downloader.ex
++++ b/apps/explorer/lib/explorer/smart_contract/solc_downloader.ex
+@@ -24,11 +24,19 @@ defmodule Explorer.SmartContract.SolcDownloader do
+             []
+         end
+ 
+-      if version in compiler_versions do
+-        GenServer.call(__MODULE__, {:ensure_exists, version}, 60_000)
++      if is_map(compiler_versions) do
++        case Map.fetch(compiler_versions, version) do
++          {:ok, version} -> GenServer.call(__MODULE__, {:ensure_exists, version}, 60_000)
++          _ -> false
++        end
+       else
+-        false
++        if version in compiler_versions do
++          GenServer.call(__MODULE__, {:ensure_exists, version}, 60_000)
++        else
++          false
++        end
+       end
++
+     end
+   end
+ 
+@@ -47,12 +55,14 @@ defmodule Explorer.SmartContract.SolcDownloader do
+   # sobelow_skip ["Traversal"]
+   @impl true
+   def handle_call({:ensure_exists, version}, _from, state) do
++    full_version = version
++    version = ~r/v(?<version>.+)\+/ |> Regex.named_captures(version) |> Map.fetch!("version")
+     path = file_path(version)
+ 
+     if fetch?(version, path) do
+       temp_path = file_path("#{version}-tmp")
+ 
+-      contents = download(version)
++      contents = download(full_version)
+ 
+       file = File.open!(temp_path, [:write, :exclusive])
+ 
 diff --git a/apps/explorer/lib/explorer/smart_contract/solidity/code_compiler.ex b/apps/explorer/lib/explorer/smart_contract/solidity/code_compiler.ex
 index adb0779..224da4d 100644
 --- a/apps/explorer/lib/explorer/smart_contract/solidity/code_compiler.ex
